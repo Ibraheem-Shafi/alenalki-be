@@ -89,12 +89,12 @@ router.patch('/news/:id/toggle-trending', protect, restrictTo('ADMIN', 'EDITOR')
 router.delete('/news/:id', protect, restrictTo('ADMIN', 'EDITOR'), newsController.deleteNews);                                       // Delete news
 
 // Blog routes - EDITORs and ADMIN can manage
-router.post('/blogs', protect, restrictTo('ADMIN', 'EDITOR'), upload.single('pdfFile'), blogController.createBlog);                 // Create blog with optional PDF upload
+router.post('/blogs', protect, restrictTo('ADMIN', 'EDITOR'), upload.fields([{ name: 'imageFile', maxCount: 1 }, { name: 'pdfFile', maxCount: 1 }]), blogController.createBlog);                 // Create blog with optional image and PDF upload
 router.get('/blogs', blogController.getAllBlogs);                                           // Get all blogs with pagination
 router.get('/blogs/public', blogController.getPublicBlogs);                                                                               // Get public blogs (active only) - public
 router.get('/blogs/featured', blogController.getFeaturedBlogs);                                                                           // Get featured blogs - public
 router.get('/blogs/:id', optionalAuth, blogController.getBlogById);                                                                       // Get blog by ID - public with auth optional
-router.put('/blogs/:id', protect, restrictTo('ADMIN', 'EDITOR'), upload.single('pdfFile'), blogController.updateBlog);              // Update blog with optional PDF upload
+router.put('/blogs/:id', protect, restrictTo('ADMIN', 'EDITOR'), upload.fields([{ name: 'imageFile', maxCount: 1 }, { name: 'pdfFile', maxCount: 1 }]), blogController.updateBlog);              // Update blog with optional image and PDF upload
 router.patch('/blogs/:id/toggle-status', protect, restrictTo('ADMIN', 'EDITOR'), blogController.toggleBlogStatus);                  // Toggle active status
 router.patch('/blogs/:id/toggle-featured', protect, restrictTo('ADMIN', 'EDITOR'), blogController.toggleFeaturedStatus);            // Toggle featured status
 router.delete('/blogs/:id', protect, restrictTo('ADMIN', 'EDITOR'), blogController.deleteBlog);                                     // Delete blog

@@ -115,6 +115,7 @@ model Blog {
   title       String
   content     String
   category    String
+  imageUrl    String?   // URL to the uploaded image file on Cloudinary
   pdfUrl      String?   // URL to the uploaded PDF file on Cloudinary
   isActive    Boolean   @default(true)
   isFeatured  Boolean   @default(false)

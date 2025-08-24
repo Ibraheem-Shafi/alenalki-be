@@ -322,8 +322,8 @@ exports.updateNews = async (req, res) => {
         ...(title !== undefined && { title }),
         ...(content !== undefined && { content }),
         ...(category !== undefined && { category }),
-        ...(isTrending !== undefined && { isTrending }),
-        ...(isActive !== undefined && { isActive }),
+        ...(isTrending !== undefined && { isTrending: Boolean(isTrending) }),
+        ...(isActive !== undefined && { isActive: Boolean(isActive) }),
         ...(imageUrl !== undefined && { imageUrl })
       }
     });

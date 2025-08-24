@@ -225,6 +225,24 @@ const uploadPdfToCloudinary = async (pdfBuffer) => {
   });
 };
 
+// Upload image to Cloudinary
+const uploadImageToCloudinary = async (imageBuffer) => {
+  return new Promise((resolve, reject) => {
+    const uploadOptions = {
+      resource_type: 'image',
+      folder: 'blog_images',
+    };
+
+    cloudinary.uploader.upload_stream(uploadOptions, (error, result) => {
+      if (error) {
+        reject(error);
+      } else {
+        resolve(result.secure_url);
+      }
+    }).end(imageBuffer);
+  });
+};
+
 // Create new blog
 exports.createBlog = async (req, res) => {
   try {
@@ -245,17 +263,33 @@ exports.createBlog = async (req, res) => {
     }
 
     let pdfUrl = null;
+    let imageUrl = null;
 
     // Check if PDF file was uploaded
-    if (req.file) {
+    if (req.files && req.files.pdfFile && req.files.pdfFile[0]) {
       try {
         // Upload PDF to Cloudinary
-        pdfUrl = await uploadPdfToCloudinary(req.file.buffer);
+        pdfUrl = await uploadPdfToCloudinary(req.files.pdfFile[0].buffer);
       } catch (uploadError) {
         console.error('Error uploading PDF to Cloudinary:', uploadError);
         return res.status(500).json({
           success: false,
           message: 'Error uploading PDF file',
+          error: uploadError.message
+        });
+      }
+    }
+
+    // Check if image file was uploaded
+    if (req.files && req.files.imageFile && req.files.imageFile[0]) {
+      try {
+        // Upload image to Cloudinary
+        imageUrl = await uploadImageToCloudinary(req.files.imageFile[0].buffer);
+      } catch (uploadError) {
+        console.error('Error uploading image to Cloudinary:', uploadError);
+        return res.status(500).json({
+          success: false,
+          message: 'Error uploading image file',
           error: uploadError.message
         });
       }
@@ -268,7 +302,8 @@ exports.createBlog = async (req, res) => {
         category,
         isFeatured: Boolean(isFeatured),
         isActive: Boolean(isActive),
-        ...(pdfUrl && { pdfUrl })
+        ...(pdfUrl && { pdfUrl }),
+        ...(imageUrl && { imageUrl })
       }
     });
 
@@ -312,17 +347,33 @@ exports.updateBlog = async (req, res) => {
     }
 
     let pdfUrl = existingBlog.pdfUrl;
+    let imageUrl = existingBlog.imageUrl;
 
     // Check if new PDF file was uploaded
-    if (req.file) {
+    if (req.files && req.files.pdfFile && req.files.pdfFile[0]) {
       try {
         // Upload new PDF to Cloudinary
-        pdfUrl = await uploadPdfToCloudinary(req.file.buffer);
+        pdfUrl = await uploadPdfToCloudinary(req.files.pdfFile[0].buffer);
       } catch (uploadError) {
         console.error('Error uploading PDF to Cloudinary:', uploadError);
         return res.status(500).json({
           success: false,
           message: 'Error uploading PDF file',
+          error: uploadError.message
+        });
+      }
+    }
+
+    // Check if new image file was uploaded
+    if (req.files && req.files.imageFile && req.files.imageFile[0]) {
+      try {
+        // Upload new image to Cloudinary
+        imageUrl = await uploadImageToCloudinary(req.files.imageFile[0].buffer);
+      } catch (uploadError) {
+        console.error('Error uploading image to Cloudinary:', uploadError);
+        return res.status(500).json({
+          success: false,
+          message: 'Error uploading image file',
           error: uploadError.message
         });
       }
@@ -335,9 +386,10 @@ exports.updateBlog = async (req, res) => {
         ...(title !== undefined && { title }),
         ...(content !== undefined && { content }),
         ...(category !== undefined && { category }),
-        ...(isFeatured !== undefined && { isFeatured }),
-        ...(isActive !== undefined && { isActive }),
-        ...(pdfUrl !== existingBlog.pdfUrl && { pdfUrl })
+        ...(isFeatured !== undefined && { isFeatured: Boolean(isFeatured === 'true' || isFeatured === true) }),
+        ...(isActive !== undefined && { isActive: Boolean(isActive === 'true' || isActive === true) }),
+        ...(pdfUrl !== existingBlog.pdfUrl && { pdfUrl }),
+        ...(imageUrl !== existingBlog.imageUrl && { imageUrl })
       }
     });
 
