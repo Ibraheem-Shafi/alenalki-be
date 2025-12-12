@@ -1,7 +1,47 @@
 // controllers/newsController.js
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
-const cloudinary = require('cloudinary').v2;
+const path = require('path');
+
+// Helper function to generate file URL from file path
+const getFileUrl = (filePath) => {
+  if (!filePath) return null;
+  // Convert file path to full URL
+  // Multer diskStorage provides absolute path like: G:\...\backend\uploads\images\filename.jpg
+  // We need: http://localhost:5000/uploads/images/filename.jpg
+  const normalizedPath = filePath.replace(/\\/g, '/');
+  
+  // Extract relative path from uploads directory
+  // Find the 'uploads' folder in the path
+  const uploadsIndex = normalizedPath.indexOf('uploads/');
+  if (uploadsIndex === -1) {
+    // If no 'uploads/' found, try to extract from the end
+    const pathParts = normalizedPath.split('/');
+    const uploadsPartIndex = pathParts.findIndex(part => part === 'uploads');
+    if (uploadsPartIndex !== -1) {
+      const relativePath = pathParts.slice(uploadsPartIndex).join('/');
+      const baseUrl = process.env.API_BASE_URL || 
+                      process.env.BACKEND_URL || 
+                      `http://localhost:${process.env.PORT || 5000}`;
+      return `${baseUrl}/${relativePath}`;
+    }
+    // Fallback: assume it's already a relative path
+    const baseUrl = process.env.API_BASE_URL || 
+                    process.env.BACKEND_URL || 
+                    `http://localhost:${process.env.PORT || 5000}`;
+    return `${baseUrl}/${normalizedPath.startsWith('/') ? normalizedPath.substring(1) : normalizedPath}`;
+  }
+  
+  // Extract everything from 'uploads/' onwards
+  const relativePath = normalizedPath.substring(uploadsIndex);
+  
+  // Get base URL from environment or construct it
+  const baseUrl = process.env.API_BASE_URL || 
+                  process.env.BACKEND_URL || 
+                  `http://localhost:${process.env.PORT || 5000}`;
+  
+  return `${baseUrl}/${relativePath}`;
+};
 
 // Get all news with filtering and pagination
 exports.getAllNews = async (req, res) => {
@@ -27,19 +67,19 @@ exports.getAllNews = async (req, res) => {
     // Build filter object
     const filter = {
       where: {
-        ...(search && {
+        ...(search && typeof search === 'string' && search.trim() && {
           OR: [
-            { title: { contains: search, mode: 'insensitive' } },
-            { content: { contains: search, mode: 'insensitive' } },
-            { category: { contains: search, mode: 'insensitive' } }
+            { title: { contains: search.trim(), mode: 'insensitive' } },
+            { content: { contains: search.trim(), mode: 'insensitive' } },
+            { category: { contains: search.trim(), mode: 'insensitive' } }
           ]
         }),
         ...(isActive !== undefined && { isActive }),
         ...(isTrending !== undefined && { isTrending }),
-        ...(category && { category: { contains: category, mode: 'insensitive' } })
+        ...(category && typeof category === 'string' && category.trim() && { category: { contains: category.trim(), mode: 'insensitive' } })
       },
       orderBy: {
-        [sortBy]: sortOrder.toLowerCase()
+        [sortBy]: sortOrder?.toLowerCase() || 'desc'
       }
     };
 
@@ -98,7 +138,7 @@ exports.getPublicNews = async (req, res) => {
       where: {
         isActive: true,
         ...(isTrendingValue !== undefined && { isTrending: isTrendingValue }),
-        ...(category && { category: { contains: category, mode: 'insensitive' } })
+        ...(category && typeof category === 'string' && category.trim() && { category: { contains: category.trim(), mode: 'insensitive' } })
       },
       orderBy: {
         createdAt: 'desc'
@@ -198,22 +238,10 @@ exports.getNewsById = async (req, res) => {
   }
 };
 
-// Upload image to Cloudinary
-const uploadImageToCloudinary = async (imageBuffer) => {
-  return new Promise((resolve, reject) => {
-    const uploadOptions = {
-      resource_type: 'image',
-      folder: 'news_images',
-    };
-
-    cloudinary.uploader.upload_stream(uploadOptions, (error, result) => {
-      if (error) {
-        reject(error);
-      } else {
-        resolve(result.secure_url);
-      }
-    }).end(imageBuffer);
-  });
+// Helper function to get image URL from uploaded file
+const getImageUrl = (file) => {
+  if (!file) return null;
+  return getFileUrl(file.path);
 };
 
 // Create new news
@@ -239,12 +267,29 @@ exports.createNews = async (req, res) => {
     let imageUrl = null;
     if (req.file) {
       try {
-        imageUrl = await uploadImageToCloudinary(req.file.buffer);
+        // Validate file type
+        if (!req.file.mimetype.startsWith('image/')) {
+          return res.status(400).json({
+            success: false,
+            message: 'Invalid file type. Only image files are allowed.'
+          });
+        }
+
+        // Validate file size (max 10MB)
+        const maxSize = 10 * 1024 * 1024; // 10MB
+        if (req.file.size > maxSize) {
+          return res.status(400).json({
+            success: false,
+            message: 'Image file size exceeds 10MB limit.'
+          });
+        }
+
+        imageUrl = getImageUrl(req.file);
       } catch (uploadError) {
-        console.error('Error uploading image:', uploadError);
+        console.error('Error processing image:', uploadError);
         return res.status(500).json({
           success: false,
-          message: 'Error uploading image',
+          message: 'Error processing image',
           error: uploadError.message
         });
       }
@@ -260,6 +305,23 @@ exports.createNews = async (req, res) => {
         imageUrl
       }
     });
+
+    // Send notifications to subscribers asynchronously (don't block response)
+    if (Boolean(isActive)) {
+      const { sendNewArticleNotification } = require('../utils/email');
+      // Fire and forget - don't wait for completion
+      sendNewArticleNotification({
+        title,
+        content,
+        category,
+        type: 'news',
+        id: news.id,
+        isActive: Boolean(isActive)
+      }).catch(error => {
+        console.error('Failed to send news notifications:', error);
+        // Don't throw - notification failure shouldn't affect article creation
+      });
+    }
 
     return res.status(201).json({
       success: true,
@@ -304,15 +366,35 @@ exports.updateNews = async (req, res) => {
     let imageUrl = undefined;
     if (req.file) {
       try {
-        imageUrl = await uploadImageToCloudinary(req.file.buffer);
+        // Validate file type
+        if (!req.file.mimetype.startsWith('image/')) {
+          return res.status(400).json({
+            success: false,
+            message: 'Invalid file type. Only image files are allowed.'
+          });
+        }
+
+        // Validate file size (max 10MB)
+        const maxSize = 10 * 1024 * 1024; // 10MB
+        if (req.file.size > maxSize) {
+          return res.status(400).json({
+            success: false,
+            message: 'Image file size exceeds 10MB limit.'
+          });
+        }
+
+        imageUrl = getImageUrl(req.file);
       } catch (uploadError) {
-        console.error('Error uploading image:', uploadError);
+        console.error('Error processing image:', uploadError);
         return res.status(500).json({
           success: false,
-          message: 'Error uploading image',
+          message: 'Error processing image',
           error: uploadError.message
         });
       }
+    } else {
+      // Preserve existing image if no new image is uploaded
+      imageUrl = existingNews.imageUrl;
     }
 
     // Update news
@@ -327,6 +409,21 @@ exports.updateNews = async (req, res) => {
         ...(imageUrl !== undefined && { imageUrl })
       }
     });
+
+    // Send notifications if article was just activated (was inactive, now active)
+    if (isActive !== undefined && Boolean(isActive) && !existingNews.isActive) {
+      const { sendNewArticleNotification } = require('../utils/email');
+      sendNewArticleNotification({
+        title: updatedNews.title,
+        content: updatedNews.content,
+        category: updatedNews.category,
+        type: 'news',
+        id: updatedNews.id,
+        isActive: Boolean(isActive)
+      }).catch(error => {
+        console.error('Failed to send news notifications:', error);
+      });
+    }
 
     return res.status(200).json({
       success: true,
@@ -358,6 +455,24 @@ exports.deleteNews = async (req, res) => {
         success: false,
         message: 'News not found'
       });
+    }
+
+    // Delete associated image file if it exists
+    if (existingNews.imageUrl) {
+      try {
+        const fs = require('fs');
+        const path = require('path');
+        const urlPath = existingNews.imageUrl.startsWith('http') 
+          ? new URL(existingNews.imageUrl).pathname 
+          : existingNews.imageUrl;
+        const filePath = path.join(__dirname, '..', urlPath.startsWith('/') ? urlPath.substring(1) : urlPath);
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+        }
+      } catch (fileError) {
+        console.error('Error deleting image file:', fileError);
+        // Continue with deletion even if file deletion fails
+      }
     }
 
     // Delete news

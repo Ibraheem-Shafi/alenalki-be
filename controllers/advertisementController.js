@@ -1,4 +1,4 @@
-// controllers/blogController.js
+// controllers/advertisementController.js
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 const path = require('path');
@@ -68,8 +68,20 @@ const deleteOldFile = (fileUrl) => {
   }
 };
 
-// Get all blogs with filtering and pagination
-exports.getAllBlogs = async (req, res) => {
+// Helper function to get PDF URL from uploaded file
+const getPdfUrl = (file) => {
+  if (!file) return null;
+  return getFileUrl(file.path);
+};
+
+// Helper function to get image URL from uploaded file
+const getImageUrl = (file) => {
+  if (!file) return null;
+  return getFileUrl(file.path);
+};
+
+// Get all advertisements with filtering and pagination
+exports.getAllAdvertisements = async (req, res) => {
   try {
     const {
       page = 1,
@@ -109,11 +121,11 @@ exports.getAllBlogs = async (req, res) => {
     };
 
     // Count total records with filter
-    const totalCount = await prisma.blog.count(filter);
+    const totalCount = await prisma.advertisement.count(filter);
     const totalPages = Math.ceil(totalCount / limitNum);
 
     // Get records with pagination
-    const blogs = await prisma.blog.findMany({
+    const advertisements = await prisma.advertisement.findMany({
       ...filter,
       skip,
       take: limitNum
@@ -122,7 +134,7 @@ exports.getAllBlogs = async (req, res) => {
     return res.status(200).json({
       success: true,
       data: {
-        blogs,
+        advertisements,
         pagination: {
           total: totalCount,
           pages: totalPages,
@@ -130,20 +142,20 @@ exports.getAllBlogs = async (req, res) => {
           limit: limitNum
         }
       },
-      message: 'Blogs retrieved successfully'
+      message: 'Advertisements retrieved successfully'
     });
   } catch (error) {
-    console.error('Error fetching blogs:', error);
+    console.error('Error fetching advertisements:', error);
     return res.status(500).json({
       success: false,
-      message: 'Error fetching blogs',
+      message: 'Error fetching advertisements',
       error: error.message
     });
   }
 };
 
-// Get public blogs (active only)
-exports.getPublicBlogs = async (req, res) => {
+// Get public advertisements (active only)
+exports.getPublicAdvertisements = async (req, res) => {
   try {
     const {
       page = 1,
@@ -171,11 +183,11 @@ exports.getPublicBlogs = async (req, res) => {
     };
 
     // Count total records with filter
-    const totalCount = await prisma.blog.count(filter);
+    const totalCount = await prisma.advertisement.count(filter);
     const totalPages = Math.ceil(totalCount / limitNum);
 
     // Get records with pagination
-    const blogs = await prisma.blog.findMany({
+    const advertisements = await prisma.advertisement.findMany({
       ...filter,
       skip,
       take: limitNum
@@ -184,7 +196,7 @@ exports.getPublicBlogs = async (req, res) => {
     return res.status(200).json({
       success: true,
       data: {
-        blogs,
+        advertisements,
         pagination: {
           total: totalCount,
           pages: totalPages,
@@ -192,22 +204,22 @@ exports.getPublicBlogs = async (req, res) => {
           limit: limitNum
         }
       },
-      message: 'Public blogs retrieved successfully'
+      message: 'Public advertisements retrieved successfully'
     });
   } catch (error) {
-    console.error('Error fetching public blogs:', error);
+    console.error('Error fetching public advertisements:', error);
     return res.status(500).json({
       success: false,
-      message: 'Error fetching public blogs',
+      message: 'Error fetching public advertisements',
       error: error.message
     });
   }
 };
 
-// Get featured blogs (active and featured only)
-exports.getFeaturedBlogs = async (req, res) => {
+// Get featured advertisements (active and featured only)
+exports.getFeaturedAdvertisements = async (req, res) => {
   try {
-    const blogs = await prisma.blog.findMany({
+    const advertisements = await prisma.advertisement.findMany({
       where: {
         isActive: true,
         isFeatured: true
@@ -219,64 +231,53 @@ exports.getFeaturedBlogs = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      data: blogs,
-      message: 'Featured blogs retrieved successfully'
+      data: advertisements,
+      message: 'Featured advertisements retrieved successfully'
     });
   } catch (error) {
-    console.error('Error fetching featured blogs:', error);
+    console.error('Error fetching featured advertisements:', error);
     return res.status(500).json({
       success: false,
-      message: 'Error fetching featured blogs',
+      message: 'Error fetching featured advertisements',
       error: error.message
     });
   }
 };
 
-// Get blog by ID
-exports.getBlogById = async (req, res) => {
+// Get advertisement by ID
+exports.getAdvertisementById = async (req, res) => {
   try {
     const { id } = req.params;
     
-    const blog = await prisma.blog.findUnique({
+    const advertisement = await prisma.advertisement.findUnique({
       where: { id }
     });
 
-    if (!blog) {
+    if (!advertisement) {
       return res.status(404).json({
         success: false,
-        message: 'Blog not found'
+        message: 'Advertisement not found'
       });
     }
 
     return res.status(200).json({
       success: true,
-      data: blog,
-      message: 'Blog retrieved successfully'
+      data: advertisement,
+      message: 'Advertisement retrieved successfully'
     });
   } catch (error) {
-    console.error('Error fetching blog:', error);
+    console.error('Error fetching advertisement:', error);
     return res.status(500).json({
       success: false,
-      message: 'Error fetching blog',
+      message: 'Error fetching advertisement',
       error: error.message
     });
   }
 };
 
-// Helper function to get PDF URL from uploaded file
-const getPdfUrl = (file) => {
-  if (!file) return null;
-  return getFileUrl(file.path);
-};
 
-// Helper function to get image URL from uploaded file
-const getImageUrl = (file) => {
-  if (!file) return null;
-  return getFileUrl(file.path);
-};
-
-// Create new blog
-exports.createBlog = async (req, res) => {
+// Create new advertisement
+exports.createAdvertisement = async (req, res) => {
   try {
     const {
       title,
@@ -363,7 +364,7 @@ exports.createBlog = async (req, res) => {
       }
     }
 
-    const blog = await prisma.blog.create({
+    const advertisement = await prisma.advertisement.create({
       data: {
         title,
         content,
@@ -383,32 +384,32 @@ exports.createBlog = async (req, res) => {
         title,
         content,
         category,
-        type: 'blog',
-        id: blog.id,
+        type: 'advertisement',
+        id: advertisement.id,
         isActive: Boolean(isActive)
       }).catch(error => {
-        console.error('Failed to send blog notifications:', error);
-        // Don't throw - notification failure shouldn't affect article creation
+        console.error('Failed to send advertisement notifications:', error);
+        // Don't throw - notification failure shouldn't affect advertisement creation
       });
     }
 
     return res.status(201).json({
       success: true,
-      data: blog,
-      message: 'Blog created successfully'
+      data: advertisement,
+      message: 'Advertisement created successfully'
     });
   } catch (error) {
-    console.error('Error creating blog:', error);
+    console.error('Error creating advertisement:', error);
     return res.status(500).json({
       success: false,
-      message: 'Error creating blog',
+      message: 'Error creating advertisement',
       error: error.message
     });
   }
 };
 
-// Update blog
-exports.updateBlog = async (req, res) => {
+// Update advertisement
+exports.updateAdvertisement = async (req, res) => {
   try {
     const { id } = req.params;
     const {
@@ -419,20 +420,20 @@ exports.updateBlog = async (req, res) => {
       isActive
     } = req.body;
 
-    // Check if blog exists
-    const existingBlog = await prisma.blog.findUnique({
+    // Check if advertisement exists
+    const existingAdvertisement = await prisma.advertisement.findUnique({
       where: { id }
     });
 
-    if (!existingBlog) {
+    if (!existingAdvertisement) {
       return res.status(404).json({
         success: false,
-        message: 'Blog not found'
+        message: 'Advertisement not found'
       });
     }
 
-    let pdfUrl = existingBlog.pdfUrl;
-    let imageUrl = existingBlog.imageUrl;
+    let pdfUrl = existingAdvertisement.pdfUrl;
+    let imageUrl = existingAdvertisement.imageUrl;
 
     // Check if new PDF file was uploaded
     if (req.files && req.files.pdfFile && req.files.pdfFile[0]) {
@@ -457,8 +458,8 @@ exports.updateBlog = async (req, res) => {
         }
 
         // Delete old PDF file if it exists
-        if (existingBlog.pdfUrl) {
-          deleteOldFile(existingBlog.pdfUrl);
+        if (existingAdvertisement.pdfUrl) {
+          deleteOldFile(existingAdvertisement.pdfUrl);
         }
 
         pdfUrl = getPdfUrl(pdfFile);
@@ -495,8 +496,8 @@ exports.updateBlog = async (req, res) => {
         }
 
         // Delete old image file if it exists
-        if (existingBlog.imageUrl) {
-          deleteOldFile(existingBlog.imageUrl);
+        if (existingAdvertisement.imageUrl) {
+          deleteOldFile(existingAdvertisement.imageUrl);
         }
 
         imageUrl = getImageUrl(imageFile);
@@ -510,8 +511,8 @@ exports.updateBlog = async (req, res) => {
       }
     }
 
-    // Update blog
-    const updatedBlog = await prisma.blog.update({
+    // Update advertisement
+    const updatedAdvertisement = await prisma.advertisement.update({
       where: { id },
       data: {
         ...(title !== undefined && { title }),
@@ -519,120 +520,105 @@ exports.updateBlog = async (req, res) => {
         ...(category !== undefined && { category }),
         ...(isFeatured !== undefined && { isFeatured: Boolean(isFeatured === 'true' || isFeatured === true) }),
         ...(isActive !== undefined && { isActive: Boolean(isActive === 'true' || isActive === true) }),
-        ...(pdfUrl !== existingBlog.pdfUrl && { pdfUrl }),
-        ...(imageUrl !== existingBlog.imageUrl && { imageUrl })
+        ...(pdfUrl !== existingAdvertisement.pdfUrl && { pdfUrl }),
+        ...(imageUrl !== existingAdvertisement.imageUrl && { imageUrl })
       }
     });
 
-    // Send notifications if article was just activated (was inactive, now active)
-    if (isActive !== undefined && Boolean(isActive === 'true' || isActive === true) && !existingBlog.isActive) {
-      const { sendNewArticleNotification } = require('../utils/email');
-      sendNewArticleNotification({
-        title: updatedBlog.title,
-        content: updatedBlog.content,
-        category: updatedBlog.category,
-        type: 'blog',
-        id: updatedBlog.id,
-        isActive: Boolean(isActive === 'true' || isActive === true)
-      }).catch(error => {
-        console.error('Failed to send blog notifications:', error);
-      });
-    }
-
     return res.status(200).json({
       success: true,
-      data: updatedBlog,
-      message: 'Blog updated successfully'
+      data: updatedAdvertisement,
+      message: 'Advertisement updated successfully'
     });
   } catch (error) {
-    console.error('Error updating blog:', error);
+    console.error('Error updating advertisement:', error);
     return res.status(500).json({
       success: false,
-      message: 'Error updating blog',
+      message: 'Error updating advertisement',
       error: error.message
     });
   }
 };
 
-// Delete blog
-exports.deleteBlog = async (req, res) => {
+// Delete advertisement
+exports.deleteAdvertisement = async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Check if blog exists
-    const existingBlog = await prisma.blog.findUnique({
+    // Check if advertisement exists
+    const existingAdvertisement = await prisma.advertisement.findUnique({
       where: { id }
     });
 
-    if (!existingBlog) {
+    if (!existingAdvertisement) {
       return res.status(404).json({
         success: false,
-        message: 'Blog not found'
+        message: 'Advertisement not found'
       });
     }
 
     // Delete associated files
-    if (existingBlog.pdfUrl) {
-      deleteOldFile(existingBlog.pdfUrl);
+    if (existingAdvertisement.pdfUrl) {
+      deleteOldFile(existingAdvertisement.pdfUrl);
     }
-    if (existingBlog.imageUrl) {
-      deleteOldFile(existingBlog.imageUrl);
+    if (existingAdvertisement.imageUrl) {
+      deleteOldFile(existingAdvertisement.imageUrl);
     }
 
-    // Delete blog
-    await prisma.blog.delete({
+    // Delete advertisement
+    await prisma.advertisement.delete({
       where: { id }
     });
 
     return res.status(200).json({
       success: true,
-      message: 'Blog deleted successfully'
+      message: 'Advertisement deleted successfully'
     });
   } catch (error) {
-    console.error('Error deleting blog:', error);
+    console.error('Error deleting advertisement:', error);
     return res.status(500).json({
       success: false,
-      message: 'Error deleting blog',
+      message: 'Error deleting advertisement',
       error: error.message
     });
   }
 };
 
-// Toggle blog status
-exports.toggleBlogStatus = async (req, res) => {
+// Toggle advertisement status
+exports.toggleAdvertisementStatus = async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Check if blog exists
-    const existingBlog = await prisma.blog.findUnique({
+    // Check if advertisement exists
+    const existingAdvertisement = await prisma.advertisement.findUnique({
       where: { id }
     });
 
-    if (!existingBlog) {
+    if (!existingAdvertisement) {
       return res.status(404).json({
         success: false,
-        message: 'Blog not found'
+        message: 'Advertisement not found'
       });
     }
 
     // Toggle status
-    const updatedBlog = await prisma.blog.update({
+    const updatedAdvertisement = await prisma.advertisement.update({
       where: { id },
       data: {
-        isActive: !existingBlog.isActive
+        isActive: !existingAdvertisement.isActive
       }
     });
 
     return res.status(200).json({
       success: true,
-      data: updatedBlog,
-      message: 'Blog status toggled successfully'
+      data: updatedAdvertisement,
+      message: 'Advertisement status toggled successfully'
     });
   } catch (error) {
-    console.error('Error toggling blog status:', error);
+    console.error('Error toggling advertisement status:', error);
     return res.status(500).json({
       success: false,
-      message: 'Error toggling blog status',
+      message: 'Error toggling advertisement status',
       error: error.message
     });
   }
@@ -643,30 +629,30 @@ exports.toggleFeaturedStatus = async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Check if blog exists
-    const existingBlog = await prisma.blog.findUnique({
+    // Check if advertisement exists
+    const existingAdvertisement = await prisma.advertisement.findUnique({
       where: { id }
     });
 
-    if (!existingBlog) {
+    if (!existingAdvertisement) {
       return res.status(404).json({
         success: false,
-        message: 'Blog not found'
+        message: 'Advertisement not found'
       });
     }
 
     // Toggle featured status
-    const updatedBlog = await prisma.blog.update({
+    const updatedAdvertisement = await prisma.advertisement.update({
       where: { id },
       data: {
-        isFeatured: !existingBlog.isFeatured
+        isFeatured: !existingAdvertisement.isFeatured
       }
     });
 
     return res.status(200).json({
       success: true,
-      data: updatedBlog,
-      message: 'Blog featured status toggled successfully'
+      data: updatedAdvertisement,
+      message: 'Advertisement featured status toggled successfully'
     });
   } catch (error) {
     console.error('Error toggling featured status:', error);
@@ -677,3 +663,4 @@ exports.toggleFeaturedStatus = async (req, res) => {
     });
   }
 };
+

@@ -115,8 +115,8 @@ model Blog {
   title       String
   content     String
   category    String
-  imageUrl    String?   // URL to the uploaded image file on Cloudinary
-  pdfUrl      String?   // URL to the uploaded PDF file on Cloudinary
+  imageUrl    String?   // URL to the uploaded image file on server
+  pdfUrl      String?   // URL to the uploaded PDF file on server
   isActive    Boolean   @default(true)
   isFeatured  Boolean   @default(false)
   authorId    String?   @db.ObjectId
@@ -139,4 +139,113 @@ model News {
   updatedAt   DateTime  @updatedAt @default(now())
 
   @@map("news")
+}
+
+model Advertisement {
+  id          String    @id @default(auto()) @map("_id") @db.ObjectId
+  title       String
+  content     String
+  category    String
+  imageUrl    String?   // URL to the uploaded image file on server
+  pdfUrl      String?   // URL to the uploaded PDF file on server
+  isActive    Boolean   @default(true)
+  isFeatured  Boolean   @default(false)
+  authorId    String?   @db.ObjectId
+  authorName  String?   // Store author name directly for flexibility
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt @default(now())
+
+  @@map("advertisements")
+}
+
+model NotificationSettings {
+  id                    String    @id @default(auto()) @map("_id") @db.ObjectId
+  newsNotifications     Boolean   @default(true)  // Enable/disable news notifications
+  blogNotifications     Boolean   @default(true)  // Enable/disable blog notifications
+  advertisementNotifications Boolean @default(true)  // Enable/disable advertisement notifications
+  advertisementEventNotifications Boolean @default(true)  // Enable/disable advertisement event notifications
+  advertisementPosterNotifications Boolean @default(true)  // Enable/disable advertisement poster notifications
+  sponsorNotifications   Boolean   @default(true)  // Enable/disable sponsor notifications
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt @default(now())
+
+  @@map("notification_settings")
+}
+
+model AdvertisementEvent {
+  id                String    @id @default(auto()) @map("_id") @db.ObjectId
+  title             String
+  description       String
+  eventType         String    // "expo", "meetup", "summit", "conference", "workshop", etc.
+  startDate         DateTime
+  endDate           DateTime?
+  startTime         String?   // "HH:MM" format
+  endTime           String?   // "HH:MM" format
+  location          String?
+  isOnline          Boolean   @default(false)
+  isFeatured        Boolean   @default(false)
+  isActive          Boolean   @default(true)
+  imageUrl          String?
+  actionButtonText  String?   // "Get Tickets", "Register", "Buy Tickets", "Reserve Seat"
+  actionButtonUrl   String?
+  actionButtonColor String?   // CSS color or Tailwind class
+  sponsorDayDate    DateTime? // If this event has a sponsor day
+  deadlineDate      DateTime? // Registration/deadline date
+  displayOrder      Int       @default(0)
+  backgroundColor   String?   // CSS color or pattern
+  icon              String?   // Icon name for event type
+  sponsorIds        String[]  @default([]) // Array of sponsor IDs
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt @default(now())
+
+  @@map("advertisement_events")
+}
+
+model AdvertisementPoster {
+  id                String    @id @default(auto()) @map("_id") @db.ObjectId
+  title             String
+  content           String
+  posterType        String?   // "poster", "banner", "promotion", etc.
+  imageUrl          String?
+  pdfUrl            String?
+  isActive          Boolean   @default(true)
+  isFeatured        Boolean   @default(false)
+  displayOrder      Int       @default(0)
+  backgroundColor   String?   // CSS color or pattern
+  actionButtonText  String?   // Optional CTA button
+  actionButtonUrl   String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt @default(now())
+
+  @@map("advertisement_posters")
+}
+
+model Sponsor {
+  id            String    @id @default(auto()) @map("_id") @db.ObjectId
+  name          String
+  logoUrl       String?
+  websiteUrl   String?
+  description   String?
+  isActive      Boolean   @default(true)
+  displayOrder  Int       @default(0)
+  sponsorDayDate DateTime?  // If they have a dedicated sponsor day
+  eventIds      String[]  @default([]) // Array of event IDs this sponsor is associated with
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt @default(now())
+
+  @@map("sponsors")
+}
+
+model AdvertisementDisplaySettings {
+  id                    String    @id @default(auto()) @map("_id") @db.ObjectId
+  enabledForNews        Boolean   @default(false)  // Enable/disable ads in news
+  enabledForBlog         Boolean   @default(false)  // Enable/disable ads in blog
+  newsAdFrequency        Int       @default(10)     // Show 1 ad per N news (e.g., 10 = 1 ad per 10 news)
+  blogAdFrequency        Int       @default(10)     // Show 1 ad per N blogs (e.g., 10 = 1 ad per 10 blogs)
+  useFeaturedAds         Boolean   @default(true)   // Use only featured ads or all active ads
+  adRotation             String    @default("sequential") // "sequential" or "random"
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt @default(now())
+
+  @@map("advertisement_display_settings")
 }

@@ -3,6 +3,7 @@ const nodemailer = require('nodemailer');
 const handlebars = require('handlebars');
 const fs = require('fs');
 const path = require('path');
+const prisma = require('./prisma');
 
 // Create reusable transporter
 const transporter = nodemailer.createTransport({
@@ -254,4 +255,118 @@ exports.sendAccountCreationEmail = async (userData) => {
       supportEmail: process.env.ADMIN_EMAIL || 'info@alenalki.se'
     }
   });
+};
+
+/**
+ * Send notification to all active subscribers about a new article (news, blog, or advertisement)
+ * @param {Object} articleData - Article data including title, content, category, type, and id
+ */
+exports.sendNewArticleNotification = async (articleData) => {
+  try {
+    const { title, content, category, type, id, isActive } = articleData;
+
+    // Only send notifications if article is active (published)
+    if (!isActive) {
+      console.log('Article is not active, skipping notification');
+      return;
+    }
+
+    // Check notification settings before sending
+    const { getNotificationSettingsHelper } = require('../controllers/notificationSettingsController');
+    const settings = await getNotificationSettingsHelper();
+
+    // Check if notifications are enabled for this type
+    if (type === 'news' && !settings.newsNotifications) {
+      console.log('News notifications are disabled, skipping notification');
+      return;
+    }
+    if (type === 'blog' && !settings.blogNotifications) {
+      console.log('Blog notifications are disabled, skipping notification');
+      return;
+    }
+    if (type === 'advertisement' && !settings.advertisementNotifications) {
+      console.log('Advertisement notifications are disabled, skipping notification');
+      return;
+    }
+
+    // Determine article type and URL
+    let articleType;
+    let articleUrl;
+    
+    if (type === 'blog') {
+      articleType = 'Blog Post';
+      articleUrl = `${process.env.CLIENT_URL || 'http://localhost:3000'}/blog/${id}`;
+    } else if (type === 'advertisement') {
+      articleType = 'Advertisement';
+      articleUrl = `${process.env.CLIENT_URL || 'http://localhost:3000'}/advertisement/${id}`;
+    } else {
+      articleType = 'News Article';
+      articleUrl = `${process.env.CLIENT_URL || 'http://localhost:3000'}/news-details?id=${id}`;
+    }
+
+    // Create preview text from content (strip HTML and limit length)
+    const stripHtml = (html) => {
+      return html.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();
+    };
+    const plainText = stripHtml(content);
+    const previewText = plainText.length > 200 
+      ? plainText.substring(0, 200) + '...' 
+      : plainText;
+
+    // Get all active subscribers in batches
+    const batchSize = 50; // Smaller batch size for notifications
+    let skip = 0;
+    let subscriberBatch;
+    let totalSent = 0;
+
+    do {
+      subscriberBatch = await prisma.newsletter.findMany({
+        where: { isActive: true },
+        select: { email: true, firstName: true },
+        skip,
+        take: batchSize
+      });
+
+      if (subscriberBatch.length > 0) {
+        // Send emails in parallel with error handling for individual failures
+        const emailPromises = subscriberBatch.map(async (subscriber) => {
+          try {
+            await exports.sendTemplatedEmail({
+              to: subscriber.email,
+              subject: `New ${articleType}: ${title}`,
+              template: 'new-article-notification',
+              context: {
+                firstName: subscriber.firstName || 'Subscriber',
+                articleType,
+                title,
+                category,
+                previewText,
+                articleUrl,
+                unsubscribeUrl: `${process.env.CLIENT_URL || 'http://localhost:3000'}/unsubscribe?email=${encodeURIComponent(subscriber.email)}`,
+                appName: process.env.APP_NAME || 'Alenalki'
+              }
+            });
+            return { success: true, email: subscriber.email };
+          } catch (error) {
+            console.error(`Failed to send notification to ${subscriber.email}:`, error.message);
+            return { success: false, email: subscriber.email, error: error.message };
+          }
+        });
+
+        const results = await Promise.all(emailPromises);
+        const successful = results.filter(r => r.success).length;
+        totalSent += successful;
+        console.log(`Sent ${articleType} notification to ${successful}/${subscriberBatch.length} subscribers in this batch`);
+      }
+
+      skip += batchSize;
+    } while (subscriberBatch.length === batchSize);
+
+    console.log(`Successfully sent ${articleType} notification to ${totalSent} subscribers`);
+    return { success: true, totalSent };
+  } catch (error) {
+    console.error('Error sending article notifications:', error);
+    // Don't throw - we don't want to fail article creation if notification fails
+    return { success: false, error: error.message };
+  }
 };

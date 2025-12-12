@@ -10,12 +10,56 @@ const festivalEventController = require('../controllers/festivalEventController'
 const transportationController = require('../controllers/transportationController');
 const newsController = require('../controllers/newsController');
 const blogController = require('../controllers/blogController');
+const advertisementController = require('../controllers/advertisementController');
+const notificationSettingsController = require('../controllers/notificationSettingsController');
+const advertisementDisplaySettingsController = require('../controllers/advertisementDisplaySettingsController');
+const advertisementEventController = require('../controllers/advertisementEventController');
+const sponsorController = require('../controllers/sponsorController');
 const multer = require('multer');
 const { protect, restrictTo, optionalAuth } = require('../middleware/authMiddleware');
 
-// Configure multer for memory storage (for Cloudinary uploads)
-const storage = multer.memoryStorage();
-const upload = multer({ storage });
+// Configure multer for disk storage
+const path = require('path');
+const fs = require('fs');
+
+// Create upload directories if they don't exist
+const uploadsDir = path.join(__dirname, '..', 'uploads');
+const imagesDir = path.join(uploadsDir, 'images');
+const pdfsDir = path.join(uploadsDir, 'pdfs');
+
+[uploadsDir, imagesDir, pdfsDir].forEach(dir => {
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+});
+
+// Configure disk storage
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    // Determine destination based on file type
+    if (file.fieldname === 'imageFile') {
+      cb(null, imagesDir);
+    } else if (file.fieldname === 'pdfFile') {
+      cb(null, pdfsDir);
+    } else {
+      cb(null, imagesDir); // Default to images
+    }
+  },
+  filename: function (req, file, cb) {
+    // Generate unique filename: timestamp-random-originalname
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const ext = path.extname(file.originalname);
+    const name = path.basename(file.originalname, ext);
+    cb(null, `${name}-${uniqueSuffix}${ext}`);
+  }
+});
+
+const upload = multer({ 
+  storage,
+  limits: {
+    fileSize: 10 * 1024 * 1024 // 10MB limit
+  }
+});
 
 // Auth routes - public
 router.post('/signup', authController.signup);
@@ -98,5 +142,47 @@ router.put('/blogs/:id', protect, restrictTo('ADMIN', 'EDITOR'), upload.fields([
 router.patch('/blogs/:id/toggle-status', protect, restrictTo('ADMIN', 'EDITOR'), blogController.toggleBlogStatus);                  // Toggle active status
 router.patch('/blogs/:id/toggle-featured', protect, restrictTo('ADMIN', 'EDITOR'), blogController.toggleFeaturedStatus);            // Toggle featured status
 router.delete('/blogs/:id', protect, restrictTo('ADMIN', 'EDITOR'), blogController.deleteBlog);                                     // Delete blog
+
+// Advertisement routes - EDITORs and ADMIN can manage
+router.post('/advertisements', protect, restrictTo('ADMIN', 'EDITOR'), upload.fields([{ name: 'imageFile', maxCount: 1 }, { name: 'pdfFile', maxCount: 1 }]), advertisementController.createAdvertisement);                 // Create advertisement with optional image and PDF upload
+router.get('/advertisements', advertisementController.getAllAdvertisements);                                           // Get all advertisements with pagination
+router.get('/advertisements/public', advertisementController.getPublicAdvertisements);                                                                               // Get public advertisements (active only) - public
+router.get('/advertisements/featured', advertisementController.getFeaturedAdvertisements);                                                                           // Get featured advertisements - public
+router.get('/advertisements/:id', optionalAuth, advertisementController.getAdvertisementById);                                                                       // Get advertisement by ID - public with auth optional
+router.put('/advertisements/:id', protect, restrictTo('ADMIN', 'EDITOR'), upload.fields([{ name: 'imageFile', maxCount: 1 }, { name: 'pdfFile', maxCount: 1 }]), advertisementController.updateAdvertisement);              // Update advertisement with optional image and PDF upload
+router.patch('/advertisements/:id/toggle-status', protect, restrictTo('ADMIN', 'EDITOR'), advertisementController.toggleAdvertisementStatus);                  // Toggle active status
+router.patch('/advertisements/:id/toggle-featured', protect, restrictTo('ADMIN', 'EDITOR'), advertisementController.toggleFeaturedStatus);            // Toggle featured status
+router.delete('/advertisements/:id', protect, restrictTo('ADMIN', 'EDITOR'), advertisementController.deleteAdvertisement);                                     // Delete advertisement
+
+// Notification Settings routes - ADMIN only
+router.get('/notification-settings', protect, restrictTo('ADMIN'), notificationSettingsController.getNotificationSettings);        // Get notification settings
+router.put('/notification-settings', protect, restrictTo('ADMIN'), notificationSettingsController.updateNotificationSettings);  // Update notification settings
+
+// Advertisement Display Settings routes - ADMIN only
+router.get('/advertisement-display-settings', protect, restrictTo('ADMIN'), advertisementDisplaySettingsController.getAdvertisementDisplaySettings);        // Get advertisement display settings
+router.put('/advertisement-display-settings', protect, restrictTo('ADMIN'), advertisementDisplaySettingsController.updateAdvertisementDisplaySettings);  // Update advertisement display settings
+router.get('/advertisement-display-settings/public', advertisementDisplaySettingsController.getPublicAdvertisementDisplaySettings);  // Public access to advertisement display settings
+
+// Advertisement Event routes
+router.post('/advertisement-events', protect, restrictTo('ADMIN', 'EDITOR'), upload.single('imageFile'), advertisementEventController.createAdvertisementEvent);
+router.get('/advertisement-events', protect, restrictTo('ADMIN', 'EDITOR'), advertisementEventController.getAllAdvertisementEvents);
+router.get('/advertisement-events/public', advertisementEventController.getPublicAdvertisementEvents);
+router.get('/advertisement-events/featured', advertisementEventController.getFeaturedAdvertisementEvent);
+router.get('/advertisement-events/upcoming', advertisementEventController.getPublicAdvertisementEvents);
+router.get('/advertisement-events/calendar', advertisementEventController.getCalendarEvents);
+router.get('/advertisement-events/:id', optionalAuth, advertisementEventController.getAdvertisementEventById);
+router.put('/advertisement-events/:id', protect, restrictTo('ADMIN', 'EDITOR'), upload.single('imageFile'), advertisementEventController.updateAdvertisementEvent);
+router.patch('/advertisement-events/:id/toggle-status', protect, restrictTo('ADMIN', 'EDITOR'), advertisementEventController.toggleEventStatus);
+router.patch('/advertisement-events/:id/toggle-featured', protect, restrictTo('ADMIN', 'EDITOR'), advertisementEventController.toggleFeaturedStatus);
+router.delete('/advertisement-events/:id', protect, restrictTo('ADMIN', 'EDITOR'), advertisementEventController.deleteAdvertisementEvent);
+
+// Sponsor routes
+router.post('/sponsors', protect, restrictTo('ADMIN', 'EDITOR'), upload.single('logoFile'), sponsorController.createSponsor);
+router.get('/sponsors', protect, restrictTo('ADMIN', 'EDITOR'), sponsorController.getAllSponsors);
+router.get('/sponsors/public', sponsorController.getPublicSponsors);
+router.get('/sponsors/:id', optionalAuth, sponsorController.getSponsorById);
+router.put('/sponsors/:id', protect, restrictTo('ADMIN', 'EDITOR'), upload.single('logoFile'), sponsorController.updateSponsor);
+router.patch('/sponsors/:id/toggle-status', protect, restrictTo('ADMIN', 'EDITOR'), sponsorController.toggleSponsorStatus);
+router.delete('/sponsors/:id', protect, restrictTo('ADMIN', 'EDITOR'), sponsorController.deleteSponsor);
 
 module.exports = router;
