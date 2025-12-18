@@ -5,24 +5,63 @@ const prisma = new PrismaClient();
 // Helper function to generate file URL
 const getFileUrl = (filePath) => {
   if (!filePath) return null;
+  // Convert file path to full URL
+  // Multer diskStorage provides absolute path like: G:\...\backend\uploads\images\filename.jpg
+  // We need: http://localhost:5000/uploads/images/filename.jpg
   const normalizedPath = filePath.replace(/\\/g, '/');
+  
+  // Extract relative path from uploads directory
+  // Find the 'uploads' folder in the path
   const uploadsIndex = normalizedPath.indexOf('uploads/');
-  if (uploadsIndex === -1) return null;
+  if (uploadsIndex === -1) {
+    // If no 'uploads/' found, try to extract from the end
+    const pathParts = normalizedPath.split('/');
+    const uploadsPartIndex = pathParts.findIndex(part => part === 'uploads');
+    if (uploadsPartIndex !== -1) {
+      const relativePath = pathParts.slice(uploadsPartIndex).join('/');
+      const baseUrl = process.env.API_BASE_URL || 
+                      process.env.BACKEND_URL || 
+                      `http://localhost:${process.env.PORT || 5000}`;
+      return `${baseUrl}/${relativePath}`;
+    }
+    // Fallback: assume it's already a relative path
+    const baseUrl = process.env.API_BASE_URL || 
+                    process.env.BACKEND_URL || 
+                    `http://localhost:${process.env.PORT || 5000}`;
+    return `${baseUrl}/${normalizedPath.startsWith('/') ? normalizedPath.substring(1) : normalizedPath}`;
+  }
+  
+  // Extract everything from 'uploads/' onwards
   const relativePath = normalizedPath.substring(uploadsIndex);
+  
+  // Get base URL from environment or construct it
   const baseUrl = process.env.API_BASE_URL || 
                   process.env.BACKEND_URL || 
                   `http://localhost:${process.env.PORT || 5000}`;
+  
   return `${baseUrl}/${relativePath}`;
 };
 
 // Get all sponsors
 exports.getAllSponsors = async (req, res) => {
   try {
-    const { page = 1, limit = 10, isActive } = req.query;
+    const { page = 1, limit = 10, isActive, search } = req.query;
     const skip = (parseInt(page) - 1) * parseInt(limit);
     
     const where = {};
-    if (isActive !== undefined) where.isActive = isActive === 'true';
+    
+    // Handle search - search in name and description
+    if (search && search.trim()) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { description: { contains: search, mode: 'insensitive' } }
+      ];
+    }
+    
+    // Handle filters - only apply if they have actual values (not empty strings)
+    if (isActive !== undefined && isActive !== '' && isActive !== null) {
+      where.isActive = isActive === 'true';
+    }
     
     const [sponsors, total] = await Promise.all([
       prisma.sponsor.findMany({
@@ -128,8 +167,9 @@ exports.createSponsor = async (req, res) => {
     }
     
     let logoUrl = null;
-    if (req.files && req.files.logoFile && req.files.logoFile[0]) {
-      logoUrl = getFileUrl(req.files.logoFile[0].path);
+    if (req.file) {
+      // Single file upload (upload.single('logoFile'))
+      logoUrl = getFileUrl(req.file.path);
     }
     
     const sponsor = await prisma.sponsor.create({
@@ -178,8 +218,9 @@ exports.updateSponsor = async (req, res) => {
     }
     
     // Handle file upload
-    if (req.files && req.files.logoFile && req.files.logoFile[0]) {
-      updateData.logoUrl = getFileUrl(req.files.logoFile[0].path);
+    if (req.file) {
+      // Single file upload (upload.single('logoFile'))
+      updateData.logoUrl = getFileUrl(req.file.path);
     }
     
     // Convert dates

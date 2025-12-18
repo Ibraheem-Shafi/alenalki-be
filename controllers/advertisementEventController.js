@@ -6,26 +6,69 @@ const path = require('path');
 // Helper function to generate file URL
 const getFileUrl = (filePath) => {
   if (!filePath) return null;
+  // Convert file path to full URL
+  // Multer diskStorage provides absolute path like: G:\...\backend\uploads\images\filename.jpg
+  // We need: http://localhost:5000/uploads/images/filename.jpg
   const normalizedPath = filePath.replace(/\\/g, '/');
+  
+  // Extract relative path from uploads directory
+  // Find the 'uploads' folder in the path
   const uploadsIndex = normalizedPath.indexOf('uploads/');
-  if (uploadsIndex === -1) return null;
+  if (uploadsIndex === -1) {
+    // If no 'uploads/' found, try to extract from the end
+    const pathParts = normalizedPath.split('/');
+    const uploadsPartIndex = pathParts.findIndex(part => part === 'uploads');
+    if (uploadsPartIndex !== -1) {
+      const relativePath = pathParts.slice(uploadsPartIndex).join('/');
+      const baseUrl = process.env.API_BASE_URL || 
+                      process.env.BACKEND_URL || 
+                      `http://localhost:${process.env.PORT || 5000}`;
+      return `${baseUrl}/${relativePath}`;
+    }
+    // Fallback: assume it's already a relative path
+    const baseUrl = process.env.API_BASE_URL || 
+                    process.env.BACKEND_URL || 
+                    `http://localhost:${process.env.PORT || 5000}`;
+    return `${baseUrl}/${normalizedPath.startsWith('/') ? normalizedPath.substring(1) : normalizedPath}`;
+  }
+  
+  // Extract everything from 'uploads/' onwards
   const relativePath = normalizedPath.substring(uploadsIndex);
+  
+  // Get base URL from environment or construct it
   const baseUrl = process.env.API_BASE_URL || 
                   process.env.BACKEND_URL || 
                   `http://localhost:${process.env.PORT || 5000}`;
+  
   return `${baseUrl}/${relativePath}`;
 };
 
 // Get all advertisement events
 exports.getAllAdvertisementEvents = async (req, res) => {
   try {
-    const { page = 1, limit = 10, isActive, isFeatured, upcoming, past, eventType } = req.query;
+    const { page = 1, limit = 10, isActive, isFeatured, upcoming, past, eventType, search } = req.query;
     const skip = (parseInt(page) - 1) * parseInt(limit);
     
     const where = {};
-    if (isActive !== undefined) where.isActive = isActive === 'true';
-    if (isFeatured !== undefined) where.isFeatured = isFeatured === 'true';
-    if (eventType) where.eventType = eventType;
+    
+    // Handle search - search in title and description
+    if (search && search.trim()) {
+      where.OR = [
+        { title: { contains: search, mode: 'insensitive' } },
+        { description: { contains: search, mode: 'insensitive' } }
+      ];
+    }
+    
+    // Handle filters - only apply if they have actual values (not empty strings)
+    if (isActive !== undefined && isActive !== '' && isActive !== null) {
+      where.isActive = isActive === 'true';
+    }
+    if (isFeatured !== undefined && isFeatured !== '' && isFeatured !== null) {
+      where.isFeatured = isFeatured === 'true';
+    }
+    if (eventType && eventType.trim()) {
+      where.eventType = eventType;
+    }
     
     const now = new Date();
     if (upcoming === 'true') {
@@ -232,8 +275,28 @@ exports.createAdvertisementEvent = async (req, res) => {
     }
     
     let imageUrl = null;
-    if (req.files && req.files.imageFile && req.files.imageFile[0]) {
-      imageUrl = getFileUrl(req.files.imageFile[0].path);
+    if (req.file) {
+      // Single file upload (upload.single('imageFile'))
+      try {
+        imageUrl = getFileUrl(req.file.path);
+        if (!imageUrl) {
+          console.error('Failed to generate imageUrl from path:', req.file.path);
+        } else {
+          console.log('Image uploaded successfully, URL:', imageUrl);
+        }
+      } catch (error) {
+        console.error('Error processing image file:', error);
+      }
+    } else {
+      console.log('No image file received in request');
+    }
+    
+    // If setting to featured, unfeature all other events first
+    if (isFeatured === 'true' || isFeatured === true || isFeatured === '1') {
+      await prisma.advertisementEvent.updateMany({
+        where: { isFeatured: true },
+        data: { isFeatured: false }
+      });
     }
     
     const event = await prisma.advertisementEvent.create({
@@ -295,8 +358,20 @@ exports.updateAdvertisementEvent = async (req, res) => {
     }
     
     // Handle file upload
-    if (req.files && req.files.imageFile && req.files.imageFile[0]) {
-      updateData.imageUrl = getFileUrl(req.files.imageFile[0].path);
+    if (req.file) {
+      // Single file upload (upload.single('imageFile'))
+      updateData.imageUrl = getFileUrl(req.file.path);
+    }
+    
+    // If setting to featured, unfeature all other events first
+    if (updateData.isFeatured === 'true' || updateData.isFeatured === true || updateData.isFeatured === '1') {
+      await prisma.advertisementEvent.updateMany({
+        where: { 
+          isFeatured: true,
+          id: { not: id }
+        },
+        data: { isFeatured: false }
+      });
     }
     
     // Convert dates
@@ -413,6 +488,17 @@ exports.toggleFeaturedStatus = async (req, res) => {
       return res.status(404).json({
         success: false,
         message: 'Advertisement event not found'
+      });
+    }
+    
+    // If setting to featured, unfeature all other events first
+    if (!event.isFeatured) {
+      await prisma.advertisementEvent.updateMany({
+        where: { 
+          isFeatured: true,
+          id: { not: id }
+        },
+        data: { isFeatured: false }
       });
     }
     
