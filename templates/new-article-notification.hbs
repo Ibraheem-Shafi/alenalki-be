@@ -1,0 +1,40 @@
+<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+  <div style="background-color: #1e40af; color: white; padding: 20px; text-align: center;">
+    <h1 style="margin: 0;">New {{articleType}} Published!</h1>
+  </div>
+  
+  <div style="padding: 20px; background-color: #ffffff;">
+    <p>Hello {{firstName}},</p>
+    
+    <p>We're excited to share that a new {{articleType}} has been published on {{appName}}!</p>
+    
+    <div style="background-color: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
+      <h2 style="color: #1e40af; margin-top: 0;">{{title}}</h2>
+      <p style="color: #6b7280; margin: 10px 0;">
+        <strong>Category:</strong> {{category}}
+      </p>
+      {{#if previewText}}
+      <p style="color: #374151; line-height: 1.6;">{{previewText}}</p>
+      {{/if}}
+    </div>
+    
+    <div style="text-align: center; margin: 30px 0;">
+      <a href="{{articleUrl}}" 
+         style="display: inline-block; background-color: #1e40af; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">
+        Read Full Article
+      </a>
+    </div>
+    
+    <hr style="margin: 30px 0; border: none; border-top: 1px solid #e5e7eb;">
+    
+    <p style="font-size: 14px; color: #6b7280;">
+      Thank you for being a valued subscriber to {{appName}}!
+    </p>
+    
+    <p style="font-size: 12px; color: #9ca3af; margin-top: 20px;">
+      You're receiving this email because you subscribed to our newsletter. 
+      <a href="{{unsubscribeUrl}}" style="color: #6b7280;">Unsubscribe</a> if you no longer wish to receive these notifications.
+    </p>
+  </div>
+</div>
+
