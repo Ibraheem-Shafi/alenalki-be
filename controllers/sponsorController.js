@@ -178,7 +178,7 @@ exports.createSponsor = async (req, res) => {
         logoUrl,
         websiteUrl,
         description,
-        isActive: isActive !== undefined ? Boolean(isActive) : true,
+        isActive: isActive !== undefined ? (isActive === true || isActive === 'true' || isActive === '1') : true,
         displayOrder: displayOrder ? parseInt(displayOrder) : 0,
         sponsorDayDate: sponsorDayDate ? new Date(sponsorDayDate) : null,
         eventIds: eventIds ? (Array.isArray(eventIds) ? eventIds : [eventIds]) : []
@@ -226,6 +226,16 @@ exports.updateSponsor = async (req, res) => {
     // Convert dates
     if (updateData.sponsorDayDate) {
       updateData.sponsorDayDate = new Date(updateData.sponsorDayDate);
+    }
+    
+    // Convert boolean fields from strings to actual booleans
+    if (updateData.isActive !== undefined) {
+      updateData.isActive = updateData.isActive === true || updateData.isActive === 'true' || updateData.isActive === '1';
+    }
+    
+    // Convert displayOrder to integer if it's a string
+    if (updateData.displayOrder !== undefined && typeof updateData.displayOrder === 'string') {
+      updateData.displayOrder = parseInt(updateData.displayOrder) || 0;
     }
     
     // Handle eventIds array

@@ -187,6 +187,7 @@ exports.getCalendarEvents = async (req, res) => {
     const startDate = new Date(parseInt(year), parseInt(month) - 1, 1);
     const endDate = new Date(parseInt(year), parseInt(month), 0, 23, 59, 59);
     
+    // Get events
     const events = await prisma.advertisementEvent.findMany({
       where: {
         isActive: true,
@@ -195,12 +196,62 @@ exports.getCalendarEvents = async (req, res) => {
           { sponsorDayDate: { gte: startDate, lte: endDate } },
           { deadlineDate: { gte: startDate, lte: endDate } }
         ]
+      },
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        eventType: true,
+        startDate: true,
+        endDate: true,
+        startTime: true,
+        endTime: true,
+        location: true,
+        isOnline: true,
+        isFeatured: true,
+        isActive: true,
+        imageUrl: true,
+        actionButtonText: true,
+        actionButtonUrl: true,
+        actionButtonColor: true,
+        sponsorDayDate: true,
+        deadlineDate: true,
+        displayOrder: true,
+        backgroundColor: true,
+        icon: true,
+        sponsorIds: true,
+        createdAt: true,
+        updatedAt: true
       }
     });
     
+    // Get sponsors with sponsorDayDate in the date range
+    const sponsors = await prisma.sponsor.findMany({
+      where: {
+        isActive: true,
+        sponsorDayDate: { gte: startDate, lte: endDate }
+      },
+      select: {
+        id: true,
+        name: true,
+        sponsorDayDate: true
+      }
+    });
+    
+    // Combine events and sponsors, marking sponsors with a type
+    const calendarItems = [
+      ...events,
+      ...sponsors.map(sponsor => ({
+        id: sponsor.id,
+        title: sponsor.name,
+        sponsorDayDate: sponsor.sponsorDayDate,
+        isSponsorDay: true // Flag to identify sponsor days
+      }))
+    ];
+    
     return res.status(200).json({
       success: true,
-      data: events
+      data: calendarItems
     });
   } catch (error) {
     console.error('Error fetching calendar events:', error);
@@ -309,9 +360,9 @@ exports.createAdvertisementEvent = async (req, res) => {
         startTime,
         endTime,
         location,
-        isOnline: Boolean(isOnline),
-        isFeatured: Boolean(isFeatured),
-        isActive: isActive !== undefined ? Boolean(isActive) : true,
+        isOnline: isOnline === true || isOnline === 'true' || isOnline === '1',
+        isFeatured: isFeatured === true || isFeatured === 'true' || isFeatured === '1',
+        isActive: isActive !== undefined ? (isActive === true || isActive === 'true' || isActive === '1') : true,
         imageUrl,
         actionButtonText,
         actionButtonUrl,
@@ -379,6 +430,22 @@ exports.updateAdvertisementEvent = async (req, res) => {
     if (updateData.endDate) updateData.endDate = new Date(updateData.endDate);
     if (updateData.sponsorDayDate) updateData.sponsorDayDate = new Date(updateData.sponsorDayDate);
     if (updateData.deadlineDate) updateData.deadlineDate = new Date(updateData.deadlineDate);
+    
+    // Convert boolean fields from strings to actual booleans
+    if (updateData.isOnline !== undefined) {
+      updateData.isOnline = updateData.isOnline === true || updateData.isOnline === 'true' || updateData.isOnline === '1';
+    }
+    if (updateData.isFeatured !== undefined) {
+      updateData.isFeatured = updateData.isFeatured === true || updateData.isFeatured === 'true' || updateData.isFeatured === '1';
+    }
+    if (updateData.isActive !== undefined) {
+      updateData.isActive = updateData.isActive === true || updateData.isActive === 'true' || updateData.isActive === '1';
+    }
+    
+    // Convert displayOrder to integer if it's a string
+    if (updateData.displayOrder !== undefined && typeof updateData.displayOrder === 'string') {
+      updateData.displayOrder = parseInt(updateData.displayOrder) || 0;
+    }
     
     // Handle sponsorIds array
     if (updateData.sponsorIds !== undefined) {
