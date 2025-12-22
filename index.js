@@ -13,7 +13,11 @@ const corsOptions = {
   origin: [
     'http://localhost:3000',
     'http://localhost:3001', 
-    'https://nchs-fe.vercel.app' // Add your actual frontend domain
+    'https://nchs-fe.vercel.app',
+    'https://alenalki.se',
+    'https://www.alenalki.se',
+    'http://alenalki.se',
+    'http://www.alenalki.se'
   ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
