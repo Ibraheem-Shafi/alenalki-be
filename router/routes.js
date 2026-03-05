@@ -15,6 +15,7 @@ const notificationSettingsController = require('../controllers/notificationSetti
 const advertisementDisplaySettingsController = require('../controllers/advertisementDisplaySettingsController');
 const advertisementEventController = require('../controllers/advertisementEventController');
 const sponsorController = require('../controllers/sponsorController');
+const commentController = require('../controllers/commentController');
 const multer = require('multer');
 const { protect, restrictTo, optionalAuth } = require('../middleware/authMiddleware');
 
@@ -126,6 +127,9 @@ router.post('/news', protect, restrictTo('ADMIN', 'EDITOR'), upload.single('imag
 router.get('/news', newsController.getAllNews);                                              // Get all news with pagination
 router.get('/news/public', newsController.getPublicNews);                                                                                  // Get public news (active only) - public
 router.get('/news/trending', newsController.getTrendingNews);                                                                              // Get trending news - public
+// Comment routes for news (must be before /news/:id)
+router.get('/news/:id/comments', (req, res, next) => { req.params.articleType = 'news'; req.params.articleId = req.params.id; next(); }, commentController.getCommentsByArticle);
+router.post('/news/:id/comments', (req, res, next) => { req.body.articleType = 'news'; req.body.articleId = req.params.id; next(); }, commentController.createComment);
 router.get('/news/:id', optionalAuth, newsController.getNewsById);                                                                         // Get news by ID - public with auth optional
 router.put('/news/:id', protect, restrictTo('ADMIN', 'EDITOR'), upload.single('imageFile'), newsController.updateNews);              // Update news with optional image upload
 router.patch('/news/:id/toggle-status', protect, restrictTo('ADMIN', 'EDITOR'), newsController.toggleNewsStatus);                    // Toggle active status
@@ -137,11 +141,19 @@ router.post('/blogs', protect, restrictTo('ADMIN', 'EDITOR'), upload.fields([{ n
 router.get('/blogs', blogController.getAllBlogs);                                           // Get all blogs with pagination
 router.get('/blogs/public', blogController.getPublicBlogs);                                                                               // Get public blogs (active only) - public
 router.get('/blogs/featured', blogController.getFeaturedBlogs);                                                                           // Get featured blogs - public
+// Comment routes for blogs (must be before /blogs/:id)
+router.get('/blogs/:id/comments', (req, res, next) => { req.params.articleType = 'blog'; req.params.articleId = req.params.id; next(); }, commentController.getCommentsByArticle);
+router.post('/blogs/:id/comments', (req, res, next) => { req.body.articleType = 'blog'; req.body.articleId = req.params.id; next(); }, commentController.createComment);
 router.get('/blogs/:id', optionalAuth, blogController.getBlogById);                                                                       // Get blog by ID - public with auth optional
 router.put('/blogs/:id', protect, restrictTo('ADMIN', 'EDITOR'), upload.fields([{ name: 'imageFile', maxCount: 1 }, { name: 'pdfFile', maxCount: 1 }]), blogController.updateBlog);              // Update blog with optional image and PDF upload
 router.patch('/blogs/:id/toggle-status', protect, restrictTo('ADMIN', 'EDITOR'), blogController.toggleBlogStatus);                  // Toggle active status
 router.patch('/blogs/:id/toggle-featured', protect, restrictTo('ADMIN', 'EDITOR'), blogController.toggleFeaturedStatus);            // Toggle featured status
 router.delete('/blogs/:id', protect, restrictTo('ADMIN', 'EDITOR'), blogController.deleteBlog);                                     // Delete blog
+
+// Comment moderation routes - EDITORs and ADMIN
+router.get('/comments', protect, restrictTo('ADMIN', 'EDITOR'), commentController.getComments);
+router.patch('/comments/:id', protect, restrictTo('ADMIN', 'EDITOR'), commentController.updateCommentStatus);
+router.delete('/comments/:id', protect, restrictTo('ADMIN', 'EDITOR'), commentController.deleteComment);
 
 // Advertisement routes - EDITORs and ADMIN can manage
 router.post('/advertisements', protect, restrictTo('ADMIN', 'EDITOR'), upload.fields([{ name: 'imageFile', maxCount: 1 }, { name: 'pdfFile', maxCount: 1 }]), advertisementController.createAdvertisement);                 // Create advertisement with optional image and PDF upload

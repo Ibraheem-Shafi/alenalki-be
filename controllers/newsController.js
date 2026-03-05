@@ -252,7 +252,8 @@ exports.createNews = async (req, res) => {
       content,
       category,
       isTrending = false,
-      isActive = true
+      isActive = true,
+      commentsEnabled = false
     } = req.body;
 
     // Validate required fields
@@ -302,6 +303,7 @@ exports.createNews = async (req, res) => {
         category,
         isTrending: Boolean(isTrending),
         isActive: Boolean(isActive),
+        commentsEnabled: Boolean(commentsEnabled),
         imageUrl
       }
     });
@@ -347,7 +349,8 @@ exports.updateNews = async (req, res) => {
       content,
       category,
       isTrending,
-      isActive
+      isActive,
+      commentsEnabled
     } = req.body;
 
     // Check if news exists
@@ -406,6 +409,7 @@ exports.updateNews = async (req, res) => {
         ...(category !== undefined && { category }),
         ...(isTrending !== undefined && { isTrending: Boolean(isTrending) }),
         ...(isActive !== undefined && { isActive: Boolean(isActive) }),
+        ...(commentsEnabled !== undefined && { commentsEnabled: Boolean(commentsEnabled) }),
         ...(imageUrl !== undefined && { imageUrl })
       }
     });
