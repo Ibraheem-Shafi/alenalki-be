@@ -111,32 +111,34 @@ model Transportation {
 }
 
 model Blog {
-  id          String    @id @default(auto()) @map("_id") @db.ObjectId
-  title       String
-  content     String
-  category    String
-  imageUrl    String?   // URL to the uploaded image file on server
-  pdfUrl      String?   // URL to the uploaded PDF file on server
-  isActive    Boolean   @default(true)
-  isFeatured  Boolean   @default(false)
-  authorId    String?   @db.ObjectId
-  authorName  String?   // Store author name directly for flexibility
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt @default(now())
+  id               String    @id @default(auto()) @map("_id") @db.ObjectId
+  title            String
+  content          String
+  category         String
+  imageUrl         String?   // URL to the uploaded image file on server
+  pdfUrl           String?   // URL to the uploaded PDF file on server
+  isActive         Boolean   @default(true)
+  isFeatured       Boolean   @default(false)
+  commentsEnabled  Boolean   @default(false)
+  authorId         String?   @db.ObjectId
+  authorName       String?   // Store author name directly for flexibility
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt @default(now())
 
   @@map("blogs")
 }
 
 model News {
-  id          String    @id @default(auto()) @map("_id") @db.ObjectId
-  title       String
-  content     String
-  category    String
-  imageUrl    String?
-  isTrending  Boolean   @default(false)
-  isActive    Boolean   @default(true)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt @default(now())
+  id               String    @id @default(auto()) @map("_id") @db.ObjectId
+  title            String
+  content          String
+  category         String
+  imageUrl         String?
+  isTrending       Boolean   @default(false)
+  isActive         Boolean   @default(true)
+  commentsEnabled  Boolean   @default(false)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt @default(now())
 
   @@map("news")
 }
@@ -248,4 +250,24 @@ model AdvertisementDisplaySettings {
   updatedAt             DateTime  @updatedAt @default(now())
 
   @@map("advertisement_display_settings")
+}
+
+enum CommentStatus {
+  PENDING
+  APPROVED
+  HIDDEN
+}
+
+model Comment {
+  id          String        @id @default(auto()) @map("_id") @db.ObjectId
+  articleType String        // "news" | "blog"
+  articleId   String        @db.ObjectId
+  body        String
+  authorName  String?       // Optional display name for public comments
+  authorId    String?       @db.ObjectId
+  status      CommentStatus @default(PENDING)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt @default(now())
+
+  @@map("comments")
 }

@@ -283,7 +283,8 @@ exports.createBlog = async (req, res) => {
       content,
       category,
       isFeatured = false,
-      isActive = true
+      isActive = true,
+      commentsEnabled = false
     } = req.body;
 
     // Validate required fields
@@ -370,6 +371,7 @@ exports.createBlog = async (req, res) => {
         category,
         isFeatured: Boolean(isFeatured),
         isActive: Boolean(isActive),
+        commentsEnabled: Boolean(commentsEnabled),
         ...(pdfUrl && { pdfUrl }),
         ...(imageUrl && { imageUrl })
       }
@@ -416,7 +418,8 @@ exports.updateBlog = async (req, res) => {
       content,
       category,
       isFeatured,
-      isActive
+      isActive,
+      commentsEnabled
     } = req.body;
 
     // Check if blog exists
@@ -519,6 +522,7 @@ exports.updateBlog = async (req, res) => {
         ...(category !== undefined && { category }),
         ...(isFeatured !== undefined && { isFeatured: Boolean(isFeatured === 'true' || isFeatured === true) }),
         ...(isActive !== undefined && { isActive: Boolean(isActive === 'true' || isActive === true) }),
+        ...(commentsEnabled !== undefined && { commentsEnabled: Boolean(commentsEnabled === 'true' || commentsEnabled === true) }),
         ...(pdfUrl !== existingBlog.pdfUrl && { pdfUrl }),
         ...(imageUrl !== existingBlog.imageUrl && { imageUrl })
       }
