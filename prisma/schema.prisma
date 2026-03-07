@@ -252,6 +252,16 @@ model AdvertisementDisplaySettings {
   @@map("advertisement_display_settings")
 }
 
+model CommentSettings {
+  id                     String   @id @default(auto()) @map("_id") @db.ObjectId
+  allowAnonymousComments  Boolean  @default(true)  // Allow users to post without a name
+  showAnonymousComments  Boolean  @default(true)   // Show anonymous comments on article pages (when false, hide comments with no name)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt @default(now())
+
+  @@map("comment_settings")
+}
+
 enum CommentStatus {
   PENDING
   APPROVED
