@@ -179,6 +179,28 @@ exports.getPublicNews = async (req, res) => {
   }
 };
 
+// List news id+title for moderation dropdown (protected)
+exports.getNewsListForModeration = async (req, res) => {
+  try {
+    const { q = '', limit = 30 } = req.query;
+    const limitNum = Math.min(parseInt(limit) || 30, 100);
+    const where = {};
+    if (q && typeof q === 'string' && q.trim()) {
+      where.title = { contains: q.trim() };
+    }
+    const list = await prisma.news.findMany({
+      where,
+      select: { id: true, title: true },
+      orderBy: { createdAt: 'desc' },
+      take: limitNum
+    });
+    return res.status(200).json({ success: true, data: list });
+  } catch (error) {
+    console.error('Error fetching news list for moderation:', error);
+    return res.status(500).json({ success: false, message: 'Failed to fetch news list' });
+  }
+};
+
 // Get trending news (active and trending only)
 exports.getTrendingNews = async (req, res) => {
   try {

@@ -1,6 +1,7 @@
 // controllers/commentController.js
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
+const { getCommentSettingsHelper } = require('./commentSettingsController');
 
 // Create comment (public) - for news or blog article
 exports.createComment = async (req, res) => {
@@ -48,21 +49,30 @@ exports.createComment = async (req, res) => {
       });
     }
 
+    const commentSettings = await getCommentSettingsHelper();
+    const nameValue = authorName && typeof authorName === 'string' ? authorName.trim().slice(0, 100) : null;
+    if (!commentSettings.allowAnonymousComments && !nameValue) {
+      return res.status(400).json({
+        success: false,
+        message: 'Name is required. Anonymous comments are not allowed.'
+      });
+    }
+
     const comment = await prisma.comment.create({
       data: {
         articleType,
         articleId,
         body: trimmedBody,
-        authorName: authorName && typeof authorName === 'string' ? authorName.trim().slice(0, 100) : null,
+        authorName: nameValue,
         authorId: req.user?.id || null,
-        status: 'PENDING'
+        status: 'APPROVED' // Show instantly; moderators can hide or delete if needed
       }
     });
 
     return res.status(201).json({
       success: true,
       data: comment,
-      message: 'Comment submitted and is pending moderation'
+      message: 'Comment posted.'
     });
   } catch (error) {
     console.error('Create comment error:', error);
@@ -85,12 +95,18 @@ exports.getCommentsByArticle = async (req, res) => {
       });
     }
 
+    const commentSettings = await getCommentSettingsHelper();
+    const where = {
+      articleType,
+      articleId,
+      status: 'APPROVED'
+    };
+    if (commentSettings && commentSettings.showAnonymousComments === false) {
+      where.authorName = { not: null };
+    }
+
     const comments = await prisma.comment.findMany({
-      where: {
-        articleType,
-        articleId,
-        status: 'APPROVED'
-      },
+      where,
       orderBy: { createdAt: 'asc' }
     });
 
@@ -110,9 +126,19 @@ exports.getCommentsByArticle = async (req, res) => {
 // Get all comments for moderation (protected)
 exports.getComments = async (req, res) => {
   try {
-    const { page = 1, limit = 20, status, articleType } = req.query;
-    const pageNum = parseInt(page);
-    const limitNum = Math.min(parseInt(limit) || 20, 100);
+    const {
+      page = 1,
+      limit = 20,
+      status,
+      articleType,
+      articleId,
+      authorName,
+      bodySearch,
+      dateFrom,
+      dateTo
+    } = req.query;
+    const pageNum = Math.max(1, parseInt(page));
+    const limitNum = Math.min(Math.max(1, parseInt(limit) || 20), 100);
     const skip = (pageNum - 1) * limitNum;
 
     const where = {};
@@ -121,6 +147,30 @@ exports.getComments = async (req, res) => {
     }
     if (articleType && ['news', 'blog'].includes(articleType)) {
       where.articleType = articleType;
+    }
+    if (articleId && typeof articleId === 'string' && articleId.trim()) {
+      where.articleId = articleId.trim();
+    }
+    if (authorName && typeof authorName === 'string' && authorName.trim()) {
+      where.authorName = { contains: authorName.trim() };
+    }
+    if (bodySearch && typeof bodySearch === 'string' && bodySearch.trim()) {
+      where.body = { contains: bodySearch.trim() };
+    }
+    if (dateFrom || dateTo) {
+      where.createdAt = {};
+      if (dateFrom && typeof dateFrom === 'string' && dateFrom.trim()) {
+        const d = new Date(dateFrom.trim());
+        if (!isNaN(d.getTime())) where.createdAt.gte = d;
+      }
+      if (dateTo && typeof dateTo === 'string' && dateTo.trim()) {
+        const d = new Date(dateTo.trim());
+        if (!isNaN(d.getTime())) {
+          d.setHours(23, 59, 59, 999);
+          where.createdAt.lte = d;
+        }
+      }
+      if (Object.keys(where.createdAt).length === 0) delete where.createdAt;
     }
 
     const [comments, total] = await Promise.all([
@@ -141,7 +191,7 @@ exports.getComments = async (req, res) => {
           page: pageNum,
           limit: limitNum,
           total,
-          pages: Math.ceil(total / limitNum)
+          pages: Math.ceil(total / limitNum) || 1
         }
       }
     });
